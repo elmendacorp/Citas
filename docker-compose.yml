@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   web:
     build:
@@ -7,4 +5,11 @@ services:
       target: production
     ports:
       - "8080:80"
+    environment:
+      - "PORT=80"
+      - "WHATSAPP_TOKEN=EAAZAZBTBuJf3ABRjLvdXtJx1eHywLIJ1LFBXTT3ljjkCztkx4BE5qRbWUlTIJ76ELnBDePN7MsZALgII4ZBGOliFSrKU5m22bHrXSJN6zHZBsu47DRnHcwMfH6D2e2XU5qO7ZCCdnlq7zEgjQOVvsF6G0LziqTmltcCKz0GgbSQVFQXYZAbIv2ysvhR7SKz6EIzjtTdzlCFkgZCMjkv38aEF9Y2CxIbeIyoTOKdzuTSk6r6it66I6mbnbYPsEHAYyiSupB8CVVLZC5d6opZA69Naq4foY9qZButcMuy0mEJ"
+      - "WHATSAPP_PHONE_ID=1167405676452853"
+      - "WEBHOOK_VERIFY_TOKEN=${WEBHOOK_VERIFY_TOKEN}"
+    volumes:
+      - ./data:/app/data
     restart: unless-stopped

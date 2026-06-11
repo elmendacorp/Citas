@@ -7,13 +7,11 @@ import {
   Mail, 
   AlertTriangle, 
   Send, 
-  Sparkles, 
-  Calendar,
-  Eye,
+  Eye, 
   Trash2
 } from 'lucide-react';
-import { SentNotification, Appointment } from '../types';
-import { formatHumanDate } from '../utils';
+import { SentNotification, Appointment, AppLog } from '../types';
+import { formatHumanDate, formatCustomDate } from '../utils';
 
 interface AlertsManagerProps {
   notifications: SentNotification[];
@@ -23,6 +21,13 @@ interface AlertsManagerProps {
   onTriggerSend: (notifId: string) => void;
   onTriggerAllDue: () => void;
   onDeleteNotification: (id: string) => void;
+  onRefreshData?: () => void;
+  settings?: {
+    dateFormat?: 'YYYY-MM-DD' | 'DD/MM/YYYY' | 'MM/DD/YYYY';
+    dispatcherHour?: string;
+  } | null;
+  logs: AppLog[];
+  onClearLogs: () => void;
 }
 
 export default function AlertsManager({
@@ -32,15 +37,38 @@ export default function AlertsManager({
   onAdvanceDate,
   onTriggerSend,
   onTriggerAllDue,
-  onDeleteNotification
+  onDeleteNotification,
+  onRefreshData,
+  settings,
+  logs,
+  onClearLogs
 }: AlertsManagerProps) {
-  const [activeTab, setActiveTab] = React.useState<'pending' | 'sent'>('pending');
+  const [activeTab, setActiveTab] = React.useState<'pending' | 'sent' | 'logs'>('pending');
   const [inspectingNotif, setInspectingNotif] = React.useState<SentNotification | null>(null);
+  const [deletingNotif, setDeletingNotif] = React.useState<SentNotification | null>(null);
+
+  const handleConfirmAppointmentManually = async (apptId: string, notifId: string) => {
+    try {
+      const appt = appointments.find(a => a.id === apptId);
+      if (appt) {
+        const updatedAppt = { ...appt, status: 'confirmed' as const };
+        await fetch(`/api/appointments/${apptId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedAppt)
+        });
+      }
+      onDeleteNotification(notifId);
+      if (onRefreshData) onRefreshData();
+    } catch (e) {
+      console.error('Failed to confirm appointment manually:', e);
+    }
+  };
 
   // Group notifications
   const pendingNotifs = React.useMemo(() => {
-    return notifications.filter(n => n.status === 'pending');
-  }, [notifications]);
+    return notifications.filter(n => n.status === 'pending' && n.scheduledForDate === simulatedDate);
+  }, [notifications, simulatedDate]);
 
   const sentNotifs = React.useMemo(() => {
     return notifications.filter(n => n.status === 'sent');
@@ -54,37 +82,6 @@ export default function AlertsManager({
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full" id="alerts-card">
       
-      {/* Simulation/Time Travel Controller */}
-      <div className="p-4 bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <Sparkles className="w-5 h-5 text-amber-400 shrink-0 select-none" />
-          <div>
-            <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-widest leading-none">Fecha de Control del Sistema</span>
-            <span className="text-sm font-bold block text-slate-100" id="simulated-date-display">
-              📅 {formatHumanDate(simulatedDate)}
-            </span>
-          </div>
-        </div>
-
-        {/* Change simulation day */}
-        <div className="flex items-center gap-1.5 self-end sm:self-auto">
-          <span className="text-xs text-slate-300 font-medium">Viajar al:</span>
-          <select
-            value={simulatedDate}
-            onChange={(e) => onAdvanceDate(e.target.value)}
-            className="text-xs font-bold text-slate-900 bg-white border border-transparent rounded-lg px-2.5 py-1.5 focus:outline-none cursor-pointer shadow-sm"
-          >
-            <option value="2026-06-09">09 Jun (Ayer)</option>
-            <option value="2026-06-10">10 Jun (Hoy Inicial)</option>
-            <option value="2026-06-11">11 Jun (Mañana)</option>
-            <option value="2026-06-12">12 Jun (Viernes)</option>
-            <option value="2026-06-13">13 Jun (Sábado)</option>
-            <option value="2026-06-14">14 Jun (Domingo)</option>
-            <option value="2026-06-15">15 Jun (Siguiente Lunes)</option>
-            <option value="2026-06-16">16 Jun (+6 Días)</option>
-          </select>
-        </div>
-      </div>
 
       {/* Due indicator alert bar */}
       {dueCount > 0 && (
@@ -136,6 +133,19 @@ export default function AlertsManager({
         >
           ✅ Enviados ({sentNotifs.length})
         </button>
+        <button
+          onClick={() => {
+            setActiveTab('logs');
+            setInspectingNotif(null);
+          }}
+          className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            activeTab === 'logs'
+              ? 'border-blue-600 text-blue-700'
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          📜 Logs ({logs.length})
+        </button>
       </div>
 
       {/* Alerts Content Area */}
@@ -181,12 +191,12 @@ export default function AlertsManager({
                       </div>
                       
                       <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                        {appt ? `Cita de ${appt.service} (${appt.date})` : 'Cita agendada'}
+                        {appt ? `Cita de ${appt.service} (${formatCustomDate(appt.date, settings?.dateFormat)})` : 'Cita agendada'}
                       </p>
 
                       <div className="text-[10px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-100/60 pt-2">
                         <span>
-                          📅 Alerta: <strong>{notif.scheduledForDate}</strong>
+                          📅 Alerta: <strong>{formatCustomDate(notif.scheduledForDate, settings?.dateFormat)}</strong>
                         </span>
                         
                         <div className="flex gap-1">
@@ -203,6 +213,13 @@ export default function AlertsManager({
                           >
                             <Send className="w-3 h-3" /> Enviar
                           </button>
+                          <button
+                            onClick={() => setDeletingNotif(notif)}
+                            className="p-1 hover:bg-rose-50 rounded text-slate-400 hover:text-rose-600 transition"
+                            title="Eliminar aviso pendiente"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -211,7 +228,7 @@ export default function AlertsManager({
               })}
             </div>
           )
-        ) : (
+        ) : activeTab === 'sent' ? (
           sentNotifs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-center text-xs space-y-2">
               <CheckCircle className="w-8 h-8 text-slate-300" />
@@ -241,12 +258,19 @@ export default function AlertsManager({
                       </span>
                     </div>
                     
-                    <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                      Enviado a: <strong className="font-mono text-slate-700">{notif.recipient}</strong>
+                    <p className="text-[11px] text-slate-555 truncate mt-0.5 font-semibold">
+                      Enviado a: <strong className="font-mono text-slate-700 font-bold">{notif.recipient}</strong>
                     </p>
 
                     <p className="text-[10px] text-slate-400 font-mono mt-1 shrink-0">
-                      ⏱️ Enviado: {notif.sentAt}
+                      ⏱️ Enviado: {(() => {
+                        if (!notif.sentAt) return '';
+                        const parts = notif.sentAt.split(' ');
+                        if (parts.length === 2) {
+                          return `${formatCustomDate(parts[0], settings?.dateFormat)} ${parts[1]}`;
+                        }
+                        return notif.sentAt;
+                      })()}
                     </p>
 
                     <div className="text-[10px] text-slate-400 mt-2 flex items-center justify-between border-t border-slate-100/60 pt-2">
@@ -270,6 +294,48 @@ export default function AlertsManager({
               ))}
             </div>
           )
+        ) : (
+          /* Logs Tab */
+          <div className="space-y-2.5" id="app-logs-list">
+            <div className="flex justify-between items-center mb-2 bg-slate-50/60 p-2 rounded-lg border border-slate-100">
+              <span className="text-[9px] uppercase font-bold text-slate-400">Actividad de la Aplicación</span>
+              {logs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={onClearLogs}
+                  className="text-[9px] font-bold text-rose-550 hover:text-rose-700 hover:underline transition cursor-pointer flex items-center gap-0.5"
+                >
+                  🗑️ Borrar Logs
+                </button>
+              )}
+            </div>
+            {logs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-center text-xs space-y-2">
+                <Clock className="w-8 h-8 text-slate-300" />
+                <div>
+                  <p className="font-semibold text-slate-500">No hay actividad registrada</p>
+                  <p className="text-[10px] max-w-xs mt-1">Los movimientos de citas, alertas y clientes se listarán aquí.</p>
+                </div>
+              </div>
+            ) : (
+              logs.map((log) => (
+                <div
+                  key={log.id}
+                  className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/30 hover:border-slate-200 transition text-[11px] space-y-1 hover:bg-slate-50/70"
+                >
+                  <div className="flex justify-between items-start gap-2 font-bold">
+                    <span className="text-slate-800 leading-tight">{log.action}</span>
+                    <span className="text-[8px] text-slate-400 font-mono font-bold shrink-0 mt-0.5 bg-slate-100 px-1 py-0.5 rounded">
+                      {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-normal font-medium whitespace-pre-wrap">
+                    {log.details}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
         )}
       </div>
 
@@ -298,16 +364,65 @@ export default function AlertsManager({
                 Asunto: {inspectingNotif.subject}
               </p>
             )}
-            <p className="text-xs text-slate-600 leading-normal whitespace-pre-wrap font-sans bg-slate-50/55 p-2 rounded border border-slate-100 max-h-[120px] overflow-y-auto font-mono text-[11px]">
+            
+            <p className="text-xs text-slate-600 leading-normal whitespace-pre-wrap font-sans bg-slate-50/55 p-2.5 rounded border border-slate-100 max-h-[150px] overflow-y-auto font-mono text-[11px]">
               {inspectingNotif.content}
             </p>
           </div>
         </div>
       )}
 
+      {deletingNotif && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs font-sans">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-100 space-y-4">
+            <div>
+              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                🗑️ Eliminar Alerta Pendiente
+              </h4>
+              <p className="text-xs text-slate-500 mt-1.5 leading-normal">
+                ¿Qué acción deseas realizar con la alerta de <strong>{deletingNotif.clientName}</strong>?
+              </p>
+            </div>
+            
+            <div className="flex flex-col gap-2.5">
+              <button
+                onClick={() => {
+                  onDeleteNotification(deletingNotif.id);
+                  setDeletingNotif(null);
+                }}
+                className="w-full text-left p-3 border border-slate-200 hover:border-blue-200 hover:bg-blue-50/20 rounded-xl transition cursor-pointer flex flex-col justify-start"
+              >
+                <span className="text-xs font-bold text-slate-800">❌ Cancelar envío de notificación</span>
+                <span className="text-[10px] text-slate-450 mt-0.5">Elimina el aviso programado sin modificar el estado de la cita.</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  handleConfirmAppointmentManually(deletingNotif.appointmentId, deletingNotif.id);
+                  setDeletingNotif(null);
+                }}
+                className="w-full text-left p-3 border border-slate-200 hover:border-emerald-200 hover:bg-emerald-50/20 rounded-xl transition cursor-pointer flex flex-col justify-start"
+              >
+                <span className="text-xs font-bold text-emerald-800">✅ Confirmar cita manualmente</span>
+                <span className="text-[10px] text-slate-450 mt-0.5">Elimina el aviso y marca el estado de la cita como "Confirmada".</span>
+              </button>
+            </div>
+            
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setDeletingNotif(null)}
+                className="px-4 py-2 text-xs font-bold border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg transition cursor-pointer"
+              >
+                Volver
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Footer hint */}
       <div className="p-3 bg-slate-50 text-[10px] text-slate-400 border-t border-slate-100 text-center font-semibold">
-        🛡️ El despachador automático corre 1 día antes a las 09:00hs.
+        🛡️ El despachador automático corre 1 día antes a las {settings?.dispatcherHour || '09:00'}hs.
       </div>
 
     </div>

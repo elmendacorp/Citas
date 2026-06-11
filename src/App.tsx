@@ -1,18 +1,18 @@
 import React from 'react';
-import { 
-  Users, 
-  Calendar as CalendarIcon, 
-  Plus, 
-  Search, 
-  Bell, 
-  Mail, 
-  Smartphone, 
-  Trash2, 
-  Edit3, 
-  CheckCircle2, 
-  XCircle, 
-  ExternalLink, 
-  Volume2, 
+import {
+  Users,
+  Calendar as CalendarIcon,
+  Plus,
+  Search,
+  Bell,
+  Mail,
+  Smartphone,
+  Trash2,
+  Edit3,
+  CheckCircle2,
+  XCircle,
+  ExternalLink,
+  Volume2,
   Trash,
   HelpCircle,
   FileMinus,
@@ -21,78 +21,86 @@ import {
   PhoneCall
 } from 'lucide-react';
 
-import { Client, Appointment, SentNotification } from './types';
-import { 
-  INITIAL_CLIENTS, 
-  INITIAL_APPOINTMENTS, 
-  INITIAL_NOTIFICATIONS 
+import { Client, Appointment, SentNotification, AppLog } from './types';
+import {
+  INITIAL_CLIENTS,
+  INITIAL_APPOINTMENTS,
+  INITIAL_NOTIFICATIONS
 } from './data';
-import { calculateAlertDate, formatHumanDate, parseTemplate } from './utils';
+import { calculateAlertDate, formatHumanDate, parseTemplate, formatCustomDate } from './utils';
 
 // Import subcomponents
 import CalendarComponent from './components/CalendarComponent';
 import AppointmentModal from './components/AppointmentModal';
 import AlertsManager from './components/AlertsManager';
+import SettingsModal from './components/SettingsModal';
+import ClientModal from './components/ClientModal';
+import PrivacyModal from './components/PrivacyModal';
 
 export default function App() {
   // State management
   const [appointments, setAppointments] = React.useState<Appointment[]>([]);
   const [clients, setClients] = React.useState<Client[]>([]);
   const [notifications, setNotifications] = React.useState<SentNotification[]>([]);
-  
+  const [settings, setSettings] = React.useState<any>(null);
+  const [logs, setLogs] = React.useState<AppLog[]>([]);
+
   // Selection and search states
   const [selectedDate, setSelectedDate] = React.useState<string>('2026-06-10');
   const [simulatedDate, setSimulatedDate] = React.useState<string>('2026-06-10');
   const [searchQuery, setSearchQuery] = React.useState<string>('');
   const [filterActive, setFilterActive] = React.useState<boolean>(false);
-  
+  const [professionalFilter, setProfessionalFilter] = React.useState<string>('');
+
   // Modal visibility states
   const [isModalOpen, setIsModalOpen] = React.useState<boolean>(false);
+  const [isSettingsOpen, setIsSettingsOpen] = React.useState<boolean>(false);
+  const [isClientModalOpen, setIsClientModalOpen] = React.useState<boolean>(false);
+  const [isPrivacyOpen, setIsPrivacyOpen] = React.useState<boolean>(false);
   const [editingAppointment, setEditingAppointment] = React.useState<Appointment | null>(null);
+  const [editingClient, setEditingClient] = React.useState<Client | null>(null);
 
   // App notification banner / toast states
   const [toastMessage, setToastMessage] = React.useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
-  // Load state from localStorage on mount (with safety fallback to static INITIAL_DATA)
-  React.useEffect(() => {
+  // Load state from API
+  const fetchData = React.useCallback(async () => {
     try {
-      const savedAppts = localStorage.getItem('gestorcitas_appointments');
-      const savedClients = localStorage.getItem('gestorcitas_clients');
-      const savedNotifs = localStorage.getItem('gestorcitas_notifications');
+      const [apptsRes, clientsRes, notifsRes, settingsRes, logsRes] = await Promise.all([
+        fetch('/api/appointments'),
+        fetch('/api/clients'),
+        fetch('/api/notifications'),
+        fetch('/api/settings'),
+        fetch('/api/logs')
+      ]);
+
+      if (apptsRes.ok) setAppointments(await apptsRes.json());
+      if (clientsRes.ok) setClients(await clientsRes.json());
+      if (notifsRes.ok) setNotifications(await notifsRes.json());
+      if (settingsRes.ok) setSettings(await settingsRes.json());
+      if (logsRes.ok) setLogs(await logsRes.json());
+
       const savedSimDate = localStorage.getItem('gestorcitas_sim_date');
-
-      if (savedAppts) setAppointments(JSON.parse(savedAppts));
-      else setAppointments(INITIAL_APPOINTMENTS);
-
-      if (savedClients) setClients(JSON.parse(savedClients));
-      else setClients(INITIAL_CLIENTS);
-
-      if (savedNotifs) setNotifications(JSON.parse(savedNotifs));
-      else setNotifications(INITIAL_NOTIFICATIONS);
-
       if (savedSimDate) setSimulatedDate(savedSimDate);
-      else setSimulatedDate('2026-06-10');
     } catch (e) {
-      console.error("No se pudieron cargar datos previos de localStorage, recurriendo a datos iniciales.", e);
-      setAppointments(INITIAL_APPOINTMENTS);
-      setClients(INITIAL_CLIENTS);
-      setNotifications(INITIAL_NOTIFICATIONS);
+      console.error("Error fetching data from API:", e);
+      showToast("Error al cargar datos de la base de datos.", "error");
     }
   }, []);
 
-  // Save changes to localStorage
-  const saveState = (
+  React.useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Save changes to API (clients and notifications handled separately mostly, but we provide this for bulk state if needed)
+  const saveState = async (
     newAppts: Appointment[],
     newClients: Client[],
     newNotifs: SentNotification[]
   ) => {
-    try {
-      localStorage.setItem('gestorcitas_appointments', JSON.stringify(newAppts));
-      localStorage.setItem('gestorcitas_clients', JSON.stringify(newClients));
-      localStorage.setItem('gestorcitas_notifications', JSON.stringify(newNotifs));
-    } catch (e) {
-      console.error("Error al guardar estado en local storage: ", e);
-    }
+    // With REST, we usually don't do bulk saves of everything on every change. 
+    // We update state locally, and specific actions trigger specific POST/PUT.
+    // For legacy support where saveState was called: we just rely on local state updates.
   };
 
   // Helper helper to show elegant alerts
@@ -103,11 +111,12 @@ export default function App() {
 
   // Automated notification generator
   const generateScheduledNotifications = (appt: Appointment): SentNotification[] => {
-    if (!appt.notificationEnabled || appt.status === 'cancelled') return [];
-    
+    // Check both global notification setting and individual appointment notification setting
+    if (!settings || !settings.notificationEnabled || !appt.notificationEnabled || appt.status === 'cancelled') return [];
+
     const alertDate = calculateAlertDate(appt.date);
     const notificationsToSchedule: SentNotification[] = [];
-    
+
     const compilePayload = {
       nombre: appt.clientName,
       servicio: appt.service,
@@ -125,7 +134,20 @@ export default function App() {
         clientName: appt.clientName,
         type: 'sms',
         recipient: appt.clientPhone || 'Móvil no registrado',
-        content: parseTemplate(appt.smsTemplate, compilePayload),
+        content: parseTemplate(settings.smsTemplate, compilePayload),
+        scheduledForDate: alertDate,
+        status: 'pending'
+      });
+    }
+
+    if (appt.notificationType === 'whatsapp' || appt.notificationType === 'both') {
+      notificationsToSchedule.push({
+        id: `whatsapp-${appt.id}-${Date.now()}`,
+        appointmentId: appt.id,
+        clientName: appt.clientName,
+        type: 'whatsapp',
+        recipient: appt.clientPhone || 'Móvil no registrado',
+        content: parseTemplate(settings.smsTemplate, compilePayload),
         scheduledForDate: alertDate,
         status: 'pending'
       });
@@ -138,8 +160,8 @@ export default function App() {
         clientName: appt.clientName,
         type: 'email',
         recipient: appt.clientEmail || 'Email no registrado',
-        subject: parseTemplate(appt.emailSubject, compilePayload),
-        content: parseTemplate(appt.emailTemplate, compilePayload),
+        subject: parseTemplate(settings.emailSubject, compilePayload),
+        content: parseTemplate(settings.emailTemplate, compilePayload),
         scheduledForDate: alertDate,
         status: 'pending'
       });
@@ -149,18 +171,16 @@ export default function App() {
   };
 
   // Handle appointment creation or editing
-  const handleSaveAppointment = (
+  const handleSaveAppointment = async (
     apptData: Omit<Appointment, 'id' | 'createdAt'> & { id?: string }
   ) => {
-    let updatedAppts = [...appointments];
-    let updatedNotifs = [...notifications];
     let updatedClients = [...clients];
 
     // Check if client is unique/new to auto-save profile in client database
     const clientExists = updatedClients.some(
       c => c.name.toLowerCase() === apptData.clientName.toLowerCase() ||
-      (apptData.clientEmail && c.email.toLowerCase() === apptData.clientEmail.toLowerCase()) ||
-      (apptData.clientPhone && c.phone === apptData.clientPhone)
+        (apptData.clientEmail && c.email.toLowerCase() === apptData.clientEmail.toLowerCase()) ||
+        (apptData.clientPhone && c.phone === apptData.clientPhone)
     );
 
     if (!clientExists) {
@@ -171,34 +191,22 @@ export default function App() {
         phone: apptData.clientPhone || 'sin-telefono',
         notes: 'Cliente registrado automáticamente desde agenda.'
       };
-      updatedClients = [newClient, ...updatedClients];
-      setClients(updatedClients);
+      await fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newClient) }).catch(console.error);
       showToast(`👤 Nuevo cliente "${apptData.clientName}" registrado automáticamente.`, 'info');
     }
 
     if (apptData.id) {
       // ✏️ EDITING existing appointment
-      updatedAppts = updatedAppts.map(a => {
-        if (a.id === apptData.id) {
-          return {
-            ...a,
-            ...apptData,
-            createdAt: a.createdAt
-          } as Appointment;
-        }
-        return a;
-      });
-
-      // Remove previous pending notifications of this appointment and schedule fresh configurations
-      updatedNotifs = updatedNotifs.filter(n => !(n.appointmentId === apptData.id && n.status === 'pending'));
+      const updatedAppt = { ...apptData, createdAt: appointments.find(a => a.id === apptData.id)?.createdAt } as Appointment;
       
-      const targetAppt = updatedAppts.find(a => a.id === apptData.id)!;
-      const freshNotifs = generateScheduledNotifications(targetAppt);
-      updatedNotifs = [...updatedNotifs, ...freshNotifs];
-
-      setAppointments(updatedAppts);
-      setNotifications(updatedNotifs);
-      showToast(`📝 Cita de ${apptData.clientName} actualizada con éxito.`);
+      try {
+        await fetch(`/api/appointments/${apptData.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedAppt) });
+        await fetchData();
+        showToast(`📝 Cita de ${apptData.clientName} actualizada con éxito.`);
+      } catch (e) {
+        console.error(e);
+        showToast("Error al actualizar la cita.", "error");
+      }
     } else {
       // 📅 CREATING a new appointment
       const newApptId = `a-${Date.now()}`;
@@ -208,31 +216,115 @@ export default function App() {
         createdAt: new Date().toISOString()
       };
 
-      updatedAppts = [newAppt, ...updatedAppts];
-      
-      // Schedule automatic notifications for the new appointment
-      const freshNotifs = generateScheduledNotifications(newAppt);
-      updatedNotifs = [...updatedNotifs, ...freshNotifs];
-
-      setAppointments(updatedAppts);
-      setNotifications(updatedNotifs);
-      setSelectedDate(newAppt.date); // jump focus to the new date
-      showToast(`✅ Cita agendada correctamente para ${apptData.clientName}.`);
+      try {
+        await fetch('/api/appointments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newAppt) });
+        await fetchData();
+        setSelectedDate(newAppt.date);
+        showToast(`✅ Cita agendada correctamente para ${apptData.clientName}.`);
+      } catch (e) {
+        console.error(e);
+        showToast("Error al agendar la cita.", "error");
+      }
     }
+  };
 
-    saveState(updatedAppts, updatedClients, updatedNotifs);
+  // Save settings globally
+  const handleSaveSettings = async (newSettings: any) => {
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings)
+      });
+      if (response.ok) {
+        setSettings(newSettings);
+        await fetchData(); // Reload to refresh notifications
+        showToast("⚙️ Configuración guardada y avisos regenerados.");
+      } else {
+        showToast("Error al guardar la configuración.", "error");
+      }
+    } catch (e) {
+      console.error(e);
+      showToast("Error al guardar la configuración.", "error");
+    }
   };
 
   // Delete an appointment
-  const handleDeleteAppointment = (apptId: string) => {
-    const updatedAppts = appointments.filter(a => a.id !== apptId);
-    // Remove both pending and sent corresponding alerts or just keep logs? Keep sent clean, delete pending
-    const updatedNotifs = notifications.filter(n => !(n.appointmentId === apptId && n.status === 'pending'));
-    
-    setAppointments(updatedAppts);
-    setNotifications(updatedNotifs);
-    saveState(updatedAppts, clients, updatedNotifs);
-    showToast(`🗑️ Cita eliminada y avisos programados desactivados.`, 'info');
+  const handleDeleteAppointment = async (apptId: string) => {
+    try {
+      await fetch(`/api/appointments/${apptId}`, { method: 'DELETE' });
+      await fetchData();
+      showToast(`🗑️ Cita eliminada y avisos programados desactivados.`, 'info');
+    } catch (e) {
+      console.error(e);
+      showToast("Error al eliminar la cita.", "error");
+    }
+  };
+
+  // Save or Edit Client manually
+  const handleSaveClient = async (clientData: Omit<Client, 'id'> & { id?: string }) => {
+    let updatedClients = [...clients];
+
+    if (clientData.id) {
+      // Edit
+      try {
+        const response = await fetch(`/api/clients/${clientData.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(clientData)
+        });
+        if (response.ok) {
+          updatedClients = updatedClients.map(c => c.id === clientData.id ? { ...clientData } as Client : c);
+          setClients(updatedClients);
+          showToast(`👤 Cliente "${clientData.name}" actualizado con éxito.`);
+        } else {
+          showToast("Error al actualizar cliente.", "error");
+        }
+      } catch (e) {
+        console.error(e);
+        showToast("Error al actualizar cliente.", "error");
+      }
+    } else {
+      // Create
+      const newClient = {
+        ...clientData,
+        id: `c-${Date.now()}`
+      } as Client;
+
+      try {
+        const response = await fetch('/api/clients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newClient)
+        });
+        if (response.ok) {
+          updatedClients = [newClient, ...updatedClients];
+          setClients(updatedClients);
+          showToast(`👤 Cliente "${clientData.name}" registrado correctamente.`);
+        } else {
+          showToast("Error al crear cliente.", "error");
+        }
+      } catch (e) {
+        console.error(e);
+        showToast("Error al crear cliente.", "error");
+      }
+    }
+  };
+
+  // Delete a client manually
+  const handleDeleteClient = async (clientId: string, clientName: string) => {
+    try {
+      const response = await fetch(`/api/clients/${clientId}`, { method: 'DELETE' });
+      if (response.ok) {
+        setClients(prev => prev.filter(c => c.id !== clientId));
+        showToast(`🗑️ Cliente "${clientName}" eliminado del directorio.`, 'info');
+      } else {
+        showToast("Error al eliminar cliente.", "error");
+      }
+    } catch (e) {
+      console.error(e);
+      showToast("Error al eliminar cliente.", "error");
+    }
   };
 
   // Trigger simulated delivery of a single notification
@@ -243,40 +335,34 @@ export default function App() {
     const updatedNotifs = notifications.map(notif => {
       if (notif.id === notifId) {
         clientNameRecipient = notif.clientName;
-        method = notif.type === 'sms' ? '📱 SMS' : '✉️ Email';
-        return {
-          ...notif,
-          status: 'sent' as const,
-          sentAt: `${simulatedDate} 09:12` // simulated timestamp
-        };
+        method = notif.type === 'sms' ? '📱 SMS' : notif.type === 'whatsapp' ? '💬 WhatsApp' : '✉️ Email';
+        const updatedNotif = { ...notif, status: 'sent' as const, sentAt: `${simulatedDate} ${settings?.dispatcherHour || '09:00'}` };
+        fetch(`/api/notifications/${notifId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedNotif) }).catch(console.error);
+        return updatedNotif;
       }
       return notif;
     });
 
     setNotifications(updatedNotifs);
-    saveState(appointments, clients, updatedNotifs);
     showToast(`🚀 ${method} automático entregado con éxito a ${clientNameRecipient}.`);
   };
 
   // Bulk trigger all due pending alarm notices for simulated date or earlier
   const handleTriggerAllDueNotifications = () => {
     let triggeredCount = 0;
-    
+
     const updatedNotifs = notifications.map(notif => {
       if (notif.status === 'pending' && notif.scheduledForDate <= simulatedDate) {
         triggeredCount++;
-        return {
-          ...notif,
-          status: 'sent' as const,
-          sentAt: `${simulatedDate} 09:00` // process batch trigger at morning
-        };
+        const updatedNotif = { ...notif, status: 'sent' as const, sentAt: `${simulatedDate} ${settings?.dispatcherHour || '09:00'}` };
+        fetch(`/api/notifications/${notif.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedNotif) }).catch(console.error);
+        return updatedNotif;
       }
       return notif;
     });
 
     if (triggeredCount > 0) {
       setNotifications(updatedNotifs);
-      saveState(appointments, clients, updatedNotifs);
       showToast(`🔔 ¡Procesado automático! Se han despachado ${triggeredCount} avisos programados para el ${simulatedDate}.`, 'success');
     } else {
       showToast(`ℹ️ No se encontraron nuevos avisos pendientes para despachar hoy.`, 'info');
@@ -285,59 +371,72 @@ export default function App() {
 
   // Delete notification log item from sent list
   const handleDeleteNotificationLog = (id: string) => {
+    fetch(`/api/notifications/${id}`, { method: 'DELETE' }).catch(console.error);
     const updatedNotifs = notifications.filter(n => n.id !== id);
     setNotifications(updatedNotifs);
-    saveState(appointments, clients, updatedNotifs);
   };
 
   // Time travel system date modifier
   const handleAdvanceSimulatedDate = (newDate: string) => {
     setSimulatedDate(newDate);
     localStorage.setItem('gestorcitas_sim_date', newDate);
-    
-    // Automatically query if there are pending alerts that are due exactly on this new date or earlier
+
     const automaticallyDispatchable = notifications.filter(
       n => n.status === 'pending' && n.scheduledForDate <= newDate
     );
 
     if (automaticallyDispatchable.length > 0) {
-      // Autotrigger simulation!
       const updatedNotifs = notifications.map(notif => {
         if (notif.status === 'pending' && notif.scheduledForDate <= newDate) {
-          return {
-            ...notif,
-            status: 'sent' as const,
-            sentAt: `${newDate} 09:00`
-          };
+          const updatedNotif = { ...notif, status: 'sent' as const, sentAt: `${newDate} ${settings?.dispatcherHour || '09:00'}` };
+          fetch(`/api/notifications/${notif.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedNotif) }).catch(console.error);
+          return updatedNotif;
         }
         return notif;
       });
 
       setNotifications(updatedNotifs);
-      saveState(appointments, clients, updatedNotifs);
       showToast(`🌟 Sistema avanzado al ${newDate}. Se despacharon automáticamente ${automaticallyDispatchable.length} avisos de citas.`, 'success');
     } else {
       showToast(`📅 Fecha simulada establecida en: ${newDate}`, 'info');
     }
   };
 
-  // Client database clean reset
-  const handleResetData = () => {
-    if (window.confirm("¿Seguro que desea restaurar los datos iniciales? Se perderán las citas nuevas.")) {
-      localStorage.clear();
-      setAppointments(INITIAL_APPOINTMENTS);
-      setClients(INITIAL_CLIENTS);
-      setNotifications(INITIAL_NOTIFICATIONS);
-      setSimulatedDate('2026-06-10');
-      setSelectedDate('2026-06-10');
-      showToast("🔄 Aplicación restaurada a valores predeterminados.");
+  // Clear application activity logs
+  const handleClearLogs = async () => {
+    try {
+      const res = await fetch('/api/logs', { method: 'DELETE' });
+      if (res.ok) {
+        await fetchData();
+        showToast("📜 Historial de logs borrado con éxito.");
+      } else {
+        showToast("Error al borrar el historial de logs.", "error");
+      }
+    } catch (e) {
+      console.error(e);
+      showToast("Error al borrar el historial de logs.", "error");
     }
   };
+
+
+
+  const professionalsList = React.useMemo(() => {
+    try {
+      return JSON.parse(settings?.professionals || '[]');
+    } catch (e) {
+      return [];
+    }
+  }, [settings?.professionals]);
 
   // Filter day's list of appointments
   const selectedDayAppointments = React.useMemo(() => {
     let dayAppts = appointments.filter(a => a.date === selectedDate);
-    
+
+    // Filter by professional if selected
+    if (professionalFilter) {
+      dayAppts = dayAppts.filter(appt => appt.professional === professionalFilter);
+    }
+
     // If search filter is active and queries have text
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -348,9 +447,15 @@ export default function App() {
         appt.service.toLowerCase().includes(q)
       ));
     }
-    
-    return dayAppts.sort((a,b) => a.time.localeCompare(b.time));
-  }, [appointments, selectedDate, searchQuery]);
+
+    return dayAppts.sort((a, b) => a.time.localeCompare(b.time));
+  }, [appointments, selectedDate, searchQuery, professionalFilter]);
+
+  // Calendar appointments filtered by professional
+  const calendarAppointments = React.useMemo(() => {
+    if (!professionalFilter) return appointments;
+    return appointments.filter(a => a.professional === professionalFilter);
+  }, [appointments, professionalFilter]);
 
   // Global search clients list
   const filteredClients = React.useMemo(() => {
@@ -367,14 +472,13 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-16 flex flex-col justify-between" id="applet-viewport">
       {/* Dynamic Toast Element */}
       {toastMessage && (
-        <div 
-          className={`fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl shadow-xl flex items-center gap-3 transition-all transform scale-100 max-w-md animate-bounce border text-xs font-bold ${
-            toastMessage.type === 'success' 
-              ? 'bg-emerald-900 border-emerald-800 text-white' 
+        <div
+          className={`fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl shadow-xl flex items-center gap-3 transition-all transform scale-100 max-w-md animate-bounce border text-xs font-bold ${toastMessage.type === 'success'
+              ? 'bg-emerald-900 border-emerald-800 text-white'
               : toastMessage.type === 'info'
                 ? 'bg-slate-900 border-slate-800 text-slate-100'
                 : 'bg-rose-900 border-rose-800 text-white'
-          }`}
+            }`}
           id="toast-notification"
         >
           <div className="flex-1 whitespace-pre-line">{toastMessage.text}</div>
@@ -387,7 +491,7 @@ export default function App() {
       {/* Primary Top Nav-Header */}
       <header className="bg-white border-b border-slate-100 sticky top-0 z-40 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          
+
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-blue-600 rounded-2xl text-white shadow-lg shadow-blue-105">
               <CalendarIcon className="w-6 h-6" />
@@ -397,7 +501,7 @@ export default function App() {
                 Gestión de Citas y Alertas
               </h1>
               <p className="text-xs text-slate-500 font-medium mt-1">
-                Agenda de clientes y avisos programados (SMS / Email) enviados 1 día antes
+                Agenda de clientes y avisos programados
               </p>
             </div>
           </div>
@@ -428,14 +532,13 @@ export default function App() {
               </span>
             </div>
           </div>
-
           <div className="flex gap-2">
             <button
-              onClick={handleResetData}
-              className="px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition cursor-pointer"
-              title="Restaurar base de datos para pruebas"
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-650 hover:text-slate-800 rounded-xl transition cursor-pointer flex items-center justify-center"
+              title="Configuración de Notificaciones"
             >
-              Resetear BD
+              ⚙️
             </button>
             <button
               onClick={() => {
@@ -454,7 +557,7 @@ export default function App() {
 
       {/* Main Container Workspace */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
-        
+
         {/* LEFT COLUMN: Client search / quick lookup (3 Columns width) */}
         <div className="lg:col-span-3 space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-4 shadow-3xs" id="client-lookup-card">
@@ -479,7 +582,7 @@ export default function App() {
                 id="search-box-input"
               />
               {searchQuery && (
-                <button 
+                <button
                   onClick={() => setSearchQuery('')}
                   className="absolute right-2.5 top-2.5 p-0.5 text-slate-400 hover:text-slate-600 bg-slate-200/50 hover:bg-slate-200 rounded-full cursor-pointer"
                 >
@@ -495,23 +598,32 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setFilterActive(!filterActive)}
-                  className={`text-[10px] px-2 py-1 font-bold rounded-md transition-all border shrink-0 cursor-pointer ${
-                    filterActive 
-                      ? 'bg-blue-600 text-white border-blue-700' 
+                  className={`text-[10px] px-2 py-1 font-bold rounded-md transition-all border shrink-0 cursor-pointer ${filterActive
+                      ? 'bg-blue-600 text-white border-blue-700'
                       : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   {filterActive ? 'Filtro Activo' : 'Efecto Destacar'}
                 </button>
               </div>
             )}
-
-            {/* List of matched clients or directory profiles */}
             <div className="space-y-2">
-              <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                Directorio ({filteredClients.length})
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  Directorio ({filteredClients.length})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingClient(null);
+                    setIsClientModalOpen(true);
+                  }}
+                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-0.5 cursor-pointer bg-white px-2 py-0.5 border border-slate-200 rounded hover:bg-slate-50 transition"
+                >
+                  👤 + Registrar
+                </button>
               </div>
-              
+
               <div className="max-h-[190px] lg:max-h-[400px] overflow-y-auto space-y-2 pr-1 scrollbar-thin">
                 {filteredClients.length === 0 ? (
                   <div className="text-center py-6 text-slate-400 text-xs">
@@ -524,14 +636,13 @@ export default function App() {
                     ).length;
 
                     return (
-                      <div 
+                      <div
                         key={client.id}
                         onClick={() => setSearchQuery(client.name)}
-                        className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
-                          searchQuery.toLowerCase() === client.name.toLowerCase()
+                        className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${searchQuery.toLowerCase() === client.name.toLowerCase()
                             ? 'bg-blue-50/50 border-blue-200 ring-1 ring-blue-500 shadow-2xs'
                             : 'bg-slate-50/30 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                        }`}
+                          }`}
                       >
                         <div className="font-bold text-slate-800 leading-tight flex items-center justify-between">
                           <span className="truncate">{client.name}</span>
@@ -539,13 +650,41 @@ export default function App() {
                             {clientApptCount} {clientApptCount === 1 ? 'cita' : 'citas'}
                           </span>
                         </div>
-                        
-                        <div className="text-[10px] text-slate-500 space-y-0.5 mt-1">
+
+                        <div className="text-[10px] text-slate-550 space-y-0.5 mt-1">
                           <p className="truncate font-mono">📱 {client.phone}</p>
                           <p className="truncate">✉️ {client.email}</p>
                         </div>
 
-                        <div className="flex gap-2 justify-end mt-2 border-t border-slate-100 pt-2 shrink-0">
+                        <div className="flex gap-2 justify-between mt-2 border-t border-slate-100 pt-2 shrink-0">
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingClient(client);
+                                setIsClientModalOpen(true);
+                              }}
+                              className="text-[9px] font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
+                              title="Editar cliente"
+                            >
+                              ✏️ Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`¿Seguro que desea eliminar a "${client.name}"?`)) {
+                                  handleDeleteClient(client.id, client.name);
+                                }
+                              }}
+                              className="text-[9px] font-bold text-rose-500 hover:text-rose-700 cursor-pointer"
+                              title="Eliminar cliente"
+                            >
+                              🗑️ Eliminar
+                            </button>
+                          </div>
+                          
                           <button
                             type="button"
                             onClick={(e) => {
@@ -555,7 +694,7 @@ export default function App() {
                                 clientName: client.name,
                                 clientPhone: client.phone,
                                 clientEmail: client.email,
-                                service: '',
+                                service: 'Cita de Fisioterapia',
                                 date: selectedDate,
                                 time: '10:00',
                                 duration: 30,
@@ -585,19 +724,38 @@ export default function App() {
 
         {/* CENTER COLUMN: Calendar & Day's appointment details (6 Columns width) */}
         <div className="lg:col-span-6 space-y-6">
-          
+
           {/* Custom Calendar view */}
           <CalendarComponent
-            appointments={appointments}
+            appointments={calendarAppointments}
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
             searchedTerm={searchQuery}
             filterActive={filterActive}
-            onOpenAddModal={(dateStr) => {
+            onOpenAddModal={(dateStr, timeStr) => {
               setSelectedDate(dateStr);
-              setEditingAppointment(null);
+              if (timeStr) {
+                setEditingAppointment({
+                  clientName: '',
+                  clientPhone: '',
+                  clientEmail: '',
+                  service: 'Cita de Fisioterapia',
+                  date: dateStr,
+                  time: timeStr,
+                  duration: settings?.defaultDuration || 30,
+                  notes: '',
+                  notificationEnabled: settings?.defaultNotificationType !== 'none',
+                  notificationType: settings?.defaultNotificationType === 'none' ? 'whatsapp' : settings?.defaultNotificationType,
+                  status: settings?.defaultStatus || 'scheduled'
+                } as any);
+              } else {
+                setEditingAppointment(null);
+              }
               setIsModalOpen(true);
             }}
+            professionalFilter={professionalFilter}
+            onSelectProfessionalFilter={setProfessionalFilter}
+            professionalsList={professionalsList}
           />
 
           {/* Day details list */}
@@ -608,10 +766,10 @@ export default function App() {
                   🗒️ Citas Agendadas
                 </h3>
                 <span className="text-[11px] text-blue-700 font-semibold block mt-0.5">
-                  📁 {formatHumanDate(selectedDate)}
+                  📁 {formatHumanDate(selectedDate)} {settings?.dateFormat && `(${formatCustomDate(selectedDate, settings.dateFormat)})`}
                 </span>
               </div>
-              
+
               <button
                 onClick={() => {
                   setEditingAppointment(null);
@@ -633,8 +791,8 @@ export default function App() {
                       No hay citas para {searchQuery ? 'este cliente' : 'este día'}
                     </h4>
                     <p className="text-[11px] text-slate-400 max-w-xs px-4 mt-0.5">
-                      {searchQuery 
-                        ? 'Prueba limpiando el buscador superior para ver todas las citas programadas de este día.' 
+                      {searchQuery
+                        ? 'Prueba limpiando el buscador superior para ver todas las citas programadas de este día.'
                         : 'Haz clic en el botón superior o en el calendario para programar una cita en esta fecha.'}
                     </p>
                   </div>
@@ -646,7 +804,7 @@ export default function App() {
                   const isAnyAlertPending = apptAlerts.some(a => a.status === 'pending');
 
                   return (
-                    <div 
+                    <div
                       key={appt.id}
                       className="p-4 rounded-xl border border-slate-100 bg-slate-50/20 hover:border-slate-200 hover:bg-slate-50/50 transition-all shadow-3xs"
                     >
@@ -657,23 +815,26 @@ export default function App() {
                             <span className="text-xs font-black text-slate-900 bg-white border border-slate-200 px-2 py-0.5 rounded font-mono shadow-3xs">
                               ⏰ {appt.time}
                             </span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                              appt.status === 'completed'
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${appt.status === 'completed'
                                 ? 'bg-emerald-100 text-emerald-800'
-                                : appt.status === 'cancelled'
-                                  ? 'bg-rose-100 text-rose-800'
-                                  : 'bg-sky-100 text-sky-800'
-                            }`}>
-                              {appt.status === 'scheduled' ? 'Programada' : appt.status === 'completed' ? 'Completada' : 'Cancelada'}
+                                : appt.status === 'confirmed'
+                                  ? 'bg-teal-100 text-teal-800'
+                                  : appt.status === 'cancelled'
+                                    ? 'bg-rose-100 text-rose-800'
+                                    : 'bg-sky-100 text-sky-800'
+                              }`}>
+                              {appt.status === 'scheduled' ? 'Programada' : appt.status === 'confirmed' ? 'Confirmada' : appt.status === 'completed' ? 'Completada' : 'Cancelada'}
                             </span>
                           </div>
-                          
+
                           <h4 className="text-sm font-bold text-slate-800 mt-2">
                             {appt.service}
                           </h4>
-                          
-                          <div className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5 mt-1">
-                            👤 Cliente: <span className="text-slate-800">{appt.clientName}</span>
+
+                          <div className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span>👤 Cliente: <strong className="text-slate-800">{appt.clientName}</strong></span>
+                            <span className="text-slate-300">•</span>
+                            <span>👩‍⚕️ Profesional: <strong className="text-slate-800">{appt.professional || 'Sin asignar'}</strong></span>
                           </div>
                         </div>
 
@@ -720,22 +881,21 @@ export default function App() {
                           <span className="block font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
                             <Bell className="w-3.5 h-3.5 text-blue-600" /> Registro de Avisos (1 día antes)
                           </span>
-                          
+
                           {appt.notificationEnabled ? (
                             <div className="space-y-1.5">
                               <p className="text-slate-600">
-                                Programado para: <strong className="text-blue-900 font-mono">{calculateAlertDate(appt.date)}</strong>
+                                Programado para: <strong className="text-blue-900 font-mono">{formatCustomDate(calculateAlertDate(appt.date), settings?.dateFormat)}</strong>
                               </p>
-                              
+
                               <div className="flex flex-wrap gap-1">
                                 {apptAlerts.map(alert => (
-                                  <span 
-                                    key={alert.id} 
-                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-bold uppercase ${
-                                      alert.status === 'sent' 
+                                  <span
+                                    key={alert.id}
+                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-bold uppercase ${alert.status === 'sent'
                                         ? 'bg-emerald-50 text-emerald-800 border border-emerald-100'
                                         : 'bg-amber-50 text-amber-800 border border-amber-100 animate-pulse'
-                                    }`}
+                                      }`}
                                     title={alert.content}
                                   >
                                     {alert.type === 'sms' ? '📱 SMS' : '✉️ Email'} ({alert.status === 'sent' ? 'Enviado' : 'Pendiente'})
@@ -769,6 +929,10 @@ export default function App() {
             onTriggerSend={handleTriggerSendNotification}
             onTriggerAllDue={handleTriggerAllDueNotifications}
             onDeleteNotification={handleDeleteNotificationLog}
+            onRefreshData={fetchData}
+            settings={settings}
+            logs={logs}
+            onClearLogs={handleClearLogs}
           />
         </div>
 
@@ -779,6 +943,15 @@ export default function App() {
         <p>📅 Calendario y Gestión de Citas y Avisos Automáticos de SMS/Email (1 día antes)</p>
         <p className="font-normal text-slate-350">
           Desarrollado para demostración de alertas automáticas. Dispone de un selector de fecha en tiempo real para simular avances temporales sin necesidad de servicios de fondo.
+        </p>
+        <p className="mt-2 text-[10px] text-slate-400 font-medium">
+          <button 
+            type="button"
+            onClick={() => setIsPrivacyOpen(true)}
+            className="text-blue-600 hover:text-blue-800 underline cursor-pointer bg-transparent border-0 font-semibold"
+          >
+            Política de Privacidad
+          </button>
         </p>
       </footer>
 
@@ -793,6 +966,34 @@ export default function App() {
         selectedDate={selectedDate}
         clients={clients}
         initialAppointment={editingAppointment}
+        settings={settings}
+      />
+
+      {/* Global Settings Configuration Modal */}
+      {settings && (
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          settings={settings}
+          onSave={handleSaveSettings}
+        />
+      )}
+
+      {/* Client Management Modal */}
+      <ClientModal
+        isOpen={isClientModalOpen}
+        onClose={() => {
+          setIsClientModalOpen(false);
+          setEditingClient(null);
+        }}
+        onSave={handleSaveClient}
+        initialClient={editingClient}
+      />
+
+      {/* Privacy Policy Modal */}
+      <PrivacyModal
+        isOpen={isPrivacyOpen}
+        onClose={() => setIsPrivacyOpen(false)}
       />
     </div>
   );

@@ -116,3 +116,17 @@ export function parseTemplate(
   result = result.replace(/{email}/g, data.email || '');
   return result;
 }
+
+export function formatCustomDate(dateStr: string, format?: string): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const [year, month, day] = parts;
+  if (format === 'DD/MM/YYYY') {
+    return `${day}/${month}/${year}`;
+  }
+  if (format === 'MM/DD/YYYY') {
+    return `${month}/${day}/${year}`;
+  }
+  return dateStr; // default to YYYY-MM-DD
+}

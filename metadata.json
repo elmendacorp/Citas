@@ -1,6 +1,8 @@
 {
-  "name": "Gestión de Citas y Calendario",
+  "name": "Citas Médicas",
   "description": "Aplicación de gestión de citas con búsqueda por datos de contacto, vista de calendario interactiva, y configuración de alertas automatizadas de SMS y Email enviadas un día antes de la cita.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

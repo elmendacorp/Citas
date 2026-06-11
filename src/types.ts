@@ -19,20 +19,21 @@ export interface Appointment {
   
   // Notification Config
   notificationEnabled: boolean;
-  notificationType: 'sms' | 'email' | 'both';
+  notificationType: 'sms' | 'email' | 'whatsapp' | 'both';
   smsTemplate: string;
   emailSubject: string;
   emailTemplate: string;
   
-  status: 'scheduled' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
   createdAt: string;
+  professional?: string;
 }
 
 export interface SentNotification {
   id: string;
   appointmentId: string;
   clientName: string;
-  type: 'sms' | 'email';
+  type: 'sms' | 'email' | 'whatsapp';
   recipient: string; // phone or email
   subject?: string;
   content: string;
@@ -40,3 +41,11 @@ export interface SentNotification {
   sentAt?: string; // YYYY-MM-DD HH:MM if sent, or undefined if pending
   status: 'pending' | 'sent' | 'failed';
 }
+
+export interface AppLog {
+  id: string;
+  action: string;
+  details: string;
+  timestamp: string;
+}
+
