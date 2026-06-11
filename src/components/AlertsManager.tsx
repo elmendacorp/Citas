@@ -3,12 +3,11 @@ import {
   Bell, 
   CheckCircle, 
   Clock, 
-  Smartphone, 
-  Mail, 
   AlertTriangle, 
   Send, 
   Eye, 
-  Trash2
+  Trash2,
+  MessageCircle
 } from 'lucide-react';
 import { SentNotification, Appointment, AppLog } from '../types';
 import { formatHumanDate, formatCustomDate } from '../utils';
@@ -174,10 +173,8 @@ export default function AlertsManager({
                         : 'bg-slate-50/50 border-slate-100 hover:border-slate-200'
                     }`}
                   >
-                    <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
-                      notif.type === 'sms' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
-                    }`}>
-                      {notif.type === 'sms' ? <Smartphone className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                    <div className="p-2 rounded-lg shrink-0 mt-0.5 bg-emerald-50 text-emerald-600">
+                      <MessageCircle className="w-4 h-4" />
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -244,10 +241,8 @@ export default function AlertsManager({
                   key={notif.id}
                   className="p-3 rounded-xl border border-slate-100 bg-white text-xs flex items-start gap-2.5 hover:border-slate-200 transition-all shadow-2xs"
                 >
-                  <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
-                    notif.type === 'sms' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-600'
-                  }`}>
-                    {notif.type === 'sms' ? <Smartphone className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                  <div className="p-2 rounded-lg shrink-0 mt-0.5 bg-emerald-50 text-emerald-600">
+                    <MessageCircle className="w-4 h-4" />
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -357,7 +352,7 @@ export default function AlertsManager({
           <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-2">
             <div className="flex justify-between items-center text-[10px] border-b border-slate-100 pb-1 text-slate-400">
               <span>Para: <strong>{inspectingNotif.clientName}</strong> ({inspectingNotif.recipient})</span>
-              <span className="uppercase font-bold text-blue-600">{inspectingNotif.type}</span>
+              <span className="uppercase font-bold text-emerald-600">{inspectingNotif.type}</span>
             </div>
             {inspectingNotif.subject && (
               <p className="text-xs font-bold text-slate-800">

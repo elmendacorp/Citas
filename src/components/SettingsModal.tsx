@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Bell, Eye, Smartphone, Mail, Info, Check, Trash2 } from 'lucide-react';
+import { X, Bell, Eye, Info, Check, Trash2 } from 'lucide-react';
 import { parseTemplate } from '../utils';
 
 interface SettingsModalProps {
@@ -63,14 +63,14 @@ export default function SettingsModal({
   React.useEffect(() => {
     if (settings) {
       setNotificationEnabled(settings.notificationEnabled);
-      setNotificationType(settings.notificationType);
+      setNotificationType('whatsapp');
       setSmsTemplate(settings.smsTemplate || '');
-      setEmailSubject(settings.emailSubject || '');
-      setEmailTemplate(settings.emailTemplate || '');
+      setEmailSubject('');
+      setEmailTemplate('');
       setDateFormat(settings.dateFormat || 'YYYY-MM-DD');
       setDefaultDuration(settings.defaultDuration || 30);
       setDefaultStatus(settings.defaultStatus || 'scheduled');
-      setDefaultNotificationType(settings.defaultNotificationType || 'whatsapp');
+      setDefaultNotificationType('whatsapp');
       setDispatcherHour(settings.dispatcherHour || '09:00');
       
       try {
@@ -80,14 +80,7 @@ export default function SettingsModal({
         setProfessionals([]);
       }
       
-      // Select appropriate preview tab
-      if (settings.notificationType === 'email') {
-        setPreviewTab('email');
-      } else if (settings.notificationType === 'sms') {
-        setPreviewTab('sms');
-      } else {
-        setPreviewTab('whatsapp');
-      }
+      setPreviewTab('whatsapp');
     }
   }, [settings, isOpen]);
 
@@ -233,7 +226,7 @@ export default function SettingsModal({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-slate-605 mb-1">
+                    <label className="block text-[10px] font-semibold text-slate-650 mb-1">
                       Aviso por Defecto
                     </label>
                     <select
@@ -242,9 +235,6 @@ export default function SettingsModal({
                       className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white font-medium cursor-pointer"
                     >
                       <option value="whatsapp">💬 WhatsApp</option>
-                      <option value="sms">📱 SMS</option>
-                      <option value="email">✉️ Email</option>
-                      <option value="both">👥 Varios (Todos)</option>
                       <option value="none">❌ Desactivado</option>
                     </select>
                   </div>
@@ -353,57 +343,6 @@ export default function SettingsModal({
 
               {notificationEnabled ? (
                 <div className="space-y-4">
-                  {/* Select Channel */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Canal del Aviso por Defecto</label>
-                    <div className="grid grid-cols-4 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => { setNotificationType('sms'); setPreviewTab('sms'); }}
-                        className={`py-2 px-1 text-[11px] font-bold rounded-lg border cursor-pointer transition-all flex items-center justify-center gap-1 ${
-                          notificationType === 'sms'
-                            ? 'bg-blue-50 border-blue-500 text-blue-700'
-                            : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-650'
-                        }`}
-                      >
-                        <Smartphone className="w-3.5 h-3.5" /> SMS
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setNotificationType('whatsapp'); setPreviewTab('whatsapp'); }}
-                        className={`py-2 px-1 text-[11px] font-bold rounded-lg border cursor-pointer transition-all flex items-center justify-center gap-1 ${
-                          notificationType === 'whatsapp'
-                            ? 'bg-emerald-50 border-emerald-500 text-emerald-750'
-                            : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-650'
-                        }`}
-                      >
-                        💬 WA
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setNotificationType('email'); setPreviewTab('email'); }}
-                        className={`py-2 px-1 text-[11px] font-bold rounded-lg border cursor-pointer transition-all flex items-center justify-center gap-1 ${
-                          notificationType === 'email'
-                            ? 'bg-blue-50 border-blue-500 text-blue-700'
-                            : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-650'
-                        }`}
-                      >
-                        <Mail className="w-3.5 h-3.5" /> Email
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setNotificationType('both')}
-                        className={`py-2 px-1 text-[11px] font-bold rounded-lg border cursor-pointer transition-all flex items-center justify-center gap-1 ${
-                          notificationType === 'both'
-                            ? 'bg-blue-50 border-blue-500 text-blue-700'
-                            : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-655'
-                        }`}
-                      >
-                        Varios
-                      </button>
-                    </div>
-                  </div>
-
                   <div className="bg-emerald-50 border border-emerald-100 text-emerald-850 rounded-xl p-3 text-xs flex gap-2">
                     <Info className="w-4 h-4 text-emerald-605 shrink-0 mt-0.5" />
                     <div>
@@ -415,100 +354,33 @@ export default function SettingsModal({
                   <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-3xs">
                     <div className="bg-slate-50/80 px-3 py-1.5 border-b border-slate-200 flex items-center justify-between text-xs">
                       <span className="font-bold text-slate-600">Personalizar Plantilla</span>
-                      
-                      <div className="flex bg-slate-200/60 p-0.5 rounded-md gap-0.5">
-                        {(notificationType === 'whatsapp' || notificationType === 'both') && (
-                          <button
-                            type="button"
-                            onClick={() => setPreviewTab('whatsapp')}
-                            className={`px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer transition-all ${
-                              previewTab === 'whatsapp' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-550 hover:text-slate-800'
-                            }`}
-                          >
-                            WA
-                          </button>
-                        )}
-                        {(notificationType === 'sms' || notificationType === 'both') && (
-                          <button
-                            type="button"
-                            onClick={() => setPreviewTab('sms')}
-                            className={`px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer transition-all ${
-                              previewTab === 'sms' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-550 hover:text-slate-800'
-                            }`}
-                          >
-                            SMS
-                          </button>
-                        )}
-                        {(notificationType === 'email' || notificationType === 'both') && (
-                          <button
-                            type="button"
-                            onClick={() => setPreviewTab('email')}
-                            className={`px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer transition-all ${
-                              previewTab === 'email' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-550 hover:text-slate-800'
-                            }`}
-                          >
-                            Email
-                          </button>
-                        )}
-                      </div>
                     </div>
 
                     <div className="p-3.5 space-y-3">
-                      {(previewTab === 'sms' || previewTab === 'whatsapp') ? (
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Cuerpo del Mensaje (SMS / WhatsApp)</label>
-                          <textarea
-                            rows={4}
-                            value={smsTemplate}
-                            onChange={(e) => setSmsTemplate(e.target.value)}
-                            className="w-full text-xs font-mono p-2.5 border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                            placeholder="Escriba la plantilla..."
-                          ></textarea>
-                          {previewTab === 'whatsapp' && (
-                            <p className="text-[9px] mt-1 text-emerald-600 font-bold italic">
-                              * El mensaje de WhatsApp se enviará con los dos botones interactivos ("Sí" / "No") de manera automática.
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Asunto del Correo</label>
-                            <input
-                              type="text"
-                              value={emailSubject}
-                              onChange={(e) => setEmailSubject(e.target.value)}
-                              className="w-full text-xs font-semibold p-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                              placeholder="Asunto del correo..."
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Cuerpo del Email</label>
-                            <textarea
-                              rows={5}
-                              value={emailTemplate}
-                              onChange={(e) => setEmailTemplate(e.target.value)}
-                              className="w-full text-xs font-mono p-2.5 border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                              placeholder="Cuerpo del correo..."
-                            ></textarea>
-                          </div>
-                        </div>
-                      )}
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Cuerpo del Mensaje (WhatsApp)</label>
+                        <textarea
+                          rows={4}
+                          value={smsTemplate}
+                          onChange={(e) => setSmsTemplate(e.target.value)}
+                          className="w-full text-xs font-mono p-2.5 border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                          placeholder="Escriba la plantilla..."
+                        ></textarea>
+                        <p className="text-[9px] mt-1 text-emerald-600 font-bold italic">
+                          * El mensaje de WhatsApp se enviará con los dos botones interactivos ("Sí" / "No") de manera automática.
+                        </p>
+                      </div>
 
                       {/* dynamic keywords tags */}
                       <div className="bg-slate-50 rounded-lg p-2.5">
                         <span className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Variables Dinámicas (clic para insertar):</span>
                         <div className="flex flex-wrap gap-1.5">
-                          {['{nombre}', '{fecha}', '{hora}', '{duracion}'].map((tag) => (
+                          {['{nombre}', '{fecha}', '{hora}', '{duracion}', '{profesional}'].map((tag) => (
                             <button
                               key={tag}
                               type="button"
                               onClick={() => {
-                                if (previewTab === 'sms' || previewTab === 'whatsapp') {
-                                  setSmsTemplate(prev => prev + ' ' + tag);
-                                } else {
-                                  setEmailTemplate(prev => prev + ' ' + tag);
-                                }
+                                setSmsTemplate(prev => prev + ' ' + tag);
                               }}
                               className="bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-200 font-mono text-[9px] text-slate-600 rounded px-2 py-0.5 transition-colors cursor-pointer"
                             >
@@ -521,7 +393,7 @@ export default function SettingsModal({
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center p-8 bg-slate-105/50 rounded-xl text-slate-400 text-center text-xs space-y-2 border border-dashed border-slate-200">
+                <div className="flex flex-col items-center justify-center p-8 bg-slate-100/50 rounded-xl text-slate-400 text-center text-xs space-y-2 border border-dashed border-slate-200">
                   <Bell className="w-8 h-8 text-slate-300 animate-none" />
                   <div>
                     <p className="font-bold text-slate-500">Recordatorios desactivados globalmente</p>
@@ -544,41 +416,24 @@ export default function SettingsModal({
                 
                 <div className="p-4 bg-slate-100/40 h-full flex flex-col justify-start min-h-[300px] overflow-y-auto">
                   {notificationEnabled ? (
-                    previewTab === 'sms' ? (
-                      <div className="bg-white p-3 rounded-lg border border-slate-200 font-mono text-xs shadow-xs max-w-sm">
-                        <span className="text-[10px] text-blue-600 font-bold block mb-1">📱 SMS RECIBIDO:</span>
-                        {parseTemplate(smsTemplate, previewPayload)}
-                      </div>
-                    ) : previewTab === 'whatsapp' ? (
-                      <div className="bg-[#e5ddd5] p-4 rounded-xl border border-slate-300 font-sans shadow-md max-w-sm flex flex-col justify-between space-y-3">
-                        <div>
-                          <span className="text-[9px] text-[#075e54] font-black tracking-widest uppercase block mb-1">💬 WHATSAPP RECIBIDO:</span>
-                          <div className="bg-white p-3 rounded-tr-lg rounded-b-lg shadow-xs text-xs text-slate-900 leading-normal max-w-[85%] relative">
-                            {parseTemplate(smsTemplate, previewPayload)}
-                          </div>
-                        </div>
-                        
-                        {/* Interactive WA buttons */}
-                        <div className="flex flex-col gap-1.5">
-                          <div className="bg-white p-2 rounded-lg text-center text-[#00a884] font-bold text-xs shadow-xs cursor-default hover:bg-slate-50 transition">
-                            Sí (Confirmar cita)
-                          </div>
-                          <div className="bg-white p-2 rounded-lg text-center text-[#f44336] font-bold text-xs shadow-xs cursor-default hover:bg-slate-50 transition">
-                            No (Rechazar cita)
-                          </div>
+                    <div className="bg-[#e5ddd5] p-4 rounded-xl border border-slate-300 font-sans shadow-md max-w-sm flex flex-col justify-between space-y-3">
+                      <div>
+                        <span className="text-[9px] text-[#075e54] font-black tracking-widest uppercase block mb-1">💬 WHATSAPP RECIBIDO:</span>
+                        <div className="bg-white p-3 rounded-tr-lg rounded-b-lg shadow-xs text-xs text-slate-900 leading-normal max-w-[85%] relative">
+                          {parseTemplate(smsTemplate, previewPayload)}
                         </div>
                       </div>
-                    ) : (
-                      <div className="bg-white p-4 rounded-xl border border-slate-200 text-xs shadow-xs">
-                        <span className="text-[10px] text-blue-700 font-bold block mb-1.5 uppercase tracking-wider">✉️ EMAIL RECIBIDO:</span>
-                        <div className="font-bold text-slate-900 border-b border-slate-100 pb-1.5 mb-2">
-                          Asunto: {parseTemplate(emailSubject, previewPayload)}
+                      
+                      {/* Interactive WA buttons */}
+                      <div className="flex flex-col gap-1.5">
+                        <div className="bg-white p-2 rounded-lg text-center text-[#00a884] font-bold text-xs shadow-xs cursor-default hover:bg-slate-50 transition">
+                          Sí (Confirmar cita)
                         </div>
-                        <div className="text-slate-650 font-sans leading-relaxed whitespace-pre-wrap">
-                          {parseTemplate(emailTemplate, previewPayload)}
+                        <div className="bg-white p-2 rounded-lg text-center text-[#f44336] font-bold text-xs shadow-xs cursor-default hover:bg-slate-50 transition">
+                          No (Rechazar cita)
                         </div>
                       </div>
-                    )
+                    </div>
                   ) : (
                     <div className="m-auto text-slate-400 text-center text-xs p-6 bg-white rounded-xl border border-slate-150 max-w-xs shadow-3xs italic">
                       Las notificaciones están apagadas. Active "Avisos Activos" a la izquierda para previsualizar los mensajes.

@@ -7,9 +7,8 @@ services:
       - "8080:80"
     environment:
       - "PORT=80"
-      - "WHATSAPP_TOKEN=${WHATSAPP_TOKEN}"
-      - "WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID}"
-      - "WEBHOOK_VERIFY_TOKEN=${WEBHOOK_VERIFY_TOKEN}"
+      - "OPENWA_API_URL=${OPENWA_API_URL}"
+      - "OPENWA_API_KEY=${OPENWA_API_KEY}"
     volumes:
       - ./data:/app/data
     restart: unless-stopped

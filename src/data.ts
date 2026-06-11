@@ -1,6 +1,6 @@
 import { Appointment, Client, SentNotification } from './types';
 
-export const DEFAULT_SMS_TEMPLATE = "Hola {nombre}, te recordamos tu cita de {servicio} mañana d\u00EDa {fecha} a las {hora}. \u00A1Te esperamos!";
+export const DEFAULT_SMS_TEMPLATE = "Hola {nombre}, te recordamos tu cita de consulta de fisioterapia mañana día {fecha} a las {hora}. ¡Te esperamos!";
 export const DEFAULT_EMAIL_SUBJECT = "Recordatorio de Cita - {servicio} ma\u00F1ana {fecha}";
 export const DEFAULT_EMAIL_TEMPLATE = `Estimado/a {nombre},
 
@@ -60,7 +60,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     duration: 50,
     notes: 'Segunda sesión de hombro.',
     notificationEnabled: true,
-    notificationType: 'both',
+    notificationType: 'whatsapp',
     smsTemplate: DEFAULT_SMS_TEMPLATE,
     emailSubject: DEFAULT_EMAIL_SUBJECT,
     emailTemplate: DEFAULT_EMAIL_TEMPLATE,
@@ -69,7 +69,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   },
   {
     id: 'a2',
-    clientName: 'Sof\u00EDa Rodr\u00EDguez',
+    clientName: 'Sofía Rodríguez',
     clientPhone: '+34 689 765 432',
     clientEmail: 'sofia.rod@email.com',
     service: 'Limpieza Dental',
@@ -78,7 +78,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     duration: 45,
     notes: 'Limpieza semestral estándar.',
     notificationEnabled: true,
-    notificationType: 'email',
+    notificationType: 'whatsapp',
     smsTemplate: DEFAULT_SMS_TEMPLATE,
     emailSubject: DEFAULT_EMAIL_SUBJECT,
     emailTemplate: DEFAULT_EMAIL_TEMPLATE,
@@ -87,16 +87,16 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   },
   {
     id: 'a3',
-    clientName: 'Alejandro G\u00F3mez',
+    clientName: 'Alejandro Gómez',
     clientPhone: '+34 677 888 999',
     clientEmail: 'ale.gomez@email.com',
-    service: 'Revisi\u00F3n de Presupuesto',
+    service: 'Revisión de Presupuesto',
     date: '2026-06-08', // in the past
     time: '12:00',
     duration: 30,
     notes: 'Cita completada con éxito.',
     notificationEnabled: true,
-    notificationType: 'sms',
+    notificationType: 'whatsapp',
     smsTemplate: DEFAULT_SMS_TEMPLATE,
     emailSubject: DEFAULT_EMAIL_SUBJECT,
     emailTemplate: DEFAULT_EMAIL_TEMPLATE,
@@ -105,16 +105,16 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   },
   {
     id: 'a4',
-    clientName: 'Mar\u00EDa \u00C1lvarez',
+    clientName: 'María Álvarez',
     clientPhone: '+34 633 444 555',
     clientEmail: 'maria.alv@email.com',
-    service: 'Consulta de Nutrici\u00F3n',
+    service: 'Consulta de Nutrición',
     date: '2026-06-15', // +5 days
     time: '18:00',
     duration: 60,
     notes: 'Ajuste de dieta de entrenamiento.',
     notificationEnabled: true,
-    notificationType: 'both',
+    notificationType: 'whatsapp',
     smsTemplate: DEFAULT_SMS_TEMPLATE,
     emailSubject: DEFAULT_EMAIL_SUBJECT,
     emailTemplate: DEFAULT_EMAIL_TEMPLATE,
@@ -127,10 +127,10 @@ export const INITIAL_NOTIFICATIONS: SentNotification[] = [
   {
     id: 'n1',
     appointmentId: 'a3',
-    clientName: 'Alejandro G\u00F3mez',
-    type: 'sms',
+    clientName: 'Alejandro Gómez',
+    type: 'whatsapp',
     recipient: '+34 677 888 999',
-    content: 'Hola Alejandro G\u00F3mez, te recordamos tu cita de Revisi\u00F3n de Presupuesto ma\u00F1ana d\u00EDa 2026-06-08 a las 12:00. \u00A1Te esperamos!',
+    content: 'Hola Alejandro Gómez, te recordamos tu cita de Revisión de Presupuesto mañana día 2026-06-08 a las 12:00. ¡Te esperamos!',
     scheduledForDate: '2026-06-07',
     sentAt: '2026-06-07 09:00',
     status: 'sent'
@@ -139,11 +139,11 @@ export const INITIAL_NOTIFICATIONS: SentNotification[] = [
     // Sofia's appointment is June 11, so notice scheduled for June 10 (today!)
     id: 'n2',
     appointmentId: 'a2',
-    clientName: 'Sof\u00EDa Rodr\u00EDguez',
-    type: 'email',
-    recipient: 'sofia.rod@email.com',
-    subject: 'Recordatorio de Cita - Limpieza Dental ma\u00F1ana 2026-06-11',
-    content: `Estimado/a Sof\u00EDa Rodr\u00EDguez,\n\nLe recordamos que se ha agendado una cita para usted:\n\n- \u00C1rea/Servicio: Limpieza Dental\n- Fecha: 2026-06-11\n- Hora: 10:30hs\n- Duraci\u00F3n estimada: 45 minutos\n\nSi necesita realizar alg\u00FAn cambio, cancelar o postergar su cita, por favor responda a este correo o ll\u00E1menos de inmediato.\n\n\u00A1Muchas gracias por confiar en nosotros!\nAtentamente,\nCentro de Gesti\u00F3n de Citas`,
+    clientName: 'Sofía Rodríguez',
+    type: 'whatsapp',
+    recipient: '+34 689 765 432',
+    subject: 'Recordatorio de Cita - Limpieza Dental mañana 2026-06-11',
+    content: `Hola Sofía Rodríguez, te recordamos tu cita de Limpieza Dental mañana día 2026-06-11 a las 10:30. ¡Te esperamos!`,
     scheduledForDate: '2026-06-10',
     status: 'pending' // pending because today is June 10, user can trigger "Procesar envíos automáticos" or "Simular enviado"
   },
@@ -151,9 +151,9 @@ export const INITIAL_NOTIFICATIONS: SentNotification[] = [
     id: 'n3',
     appointmentId: 'a1',
     clientName: 'Carlos Mendoza',
-    type: 'sms',
+    type: 'whatsapp',
     recipient: '+34 612 345 678',
-    content: 'Hola Carlos Mendoza, te recordamos tu cita de Fisioterapia General ma\u00F1ana d\u00EDa 2026-06-12 a las 16:00. \u00A1Te esperamos!',
+    content: 'Hola Carlos Mendoza, te recordamos tu cita de Fisioterapia General mañana día 2026-06-12 a las 16:00. ¡Te esperamos!',
     scheduledForDate: '2026-06-11',
     status: 'pending'
   },
@@ -161,10 +161,9 @@ export const INITIAL_NOTIFICATIONS: SentNotification[] = [
     id: 'n4',
     appointmentId: 'a1',
     clientName: 'Carlos Mendoza',
-    type: 'email',
-    recipient: 'carlos.mendoza@email.com',
-    subject: 'Recordatorio de Cita - Fisioterapia General ma\u00F1ana 2026-06-12',
-    content: `Estimado/a Carlos Mendoza,\n\nLe recordamos que se ha agendado una cita para usted:\n\n- \u00C1rea/Servicio: Fisioterapia General\n- Fecha: 2026-06-12\n- Hora: 16:00hs\n- Duraci\u00F3n estimada: 50 minutos\n\nSi necesita realizar alg\u00FAn cambio, cancelar o postergar su cita, por favor responda a este correo o ll\u00E1menos de inmediato.\n\n\u00A1Muchas gracias por confiar en nosotros!\nAtentamente,\nCentro de Gesti\u00F3n de Citas`,
+    type: 'whatsapp',
+    recipient: '+34 612 345 678',
+    content: 'Hola Carlos Mendoza, te recordamos tu cita de Fisioterapia General mañana día 2026-06-12 a las 16:00. ¡Te esperamos!',
     scheduledForDate: '2026-06-11',
     status: 'pending'
   }

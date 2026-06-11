@@ -90,7 +90,7 @@ function initDB() {
     const insert = db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)");
     insert.run("notificationEnabled", "true");
     insert.run("notificationType", "whatsapp");
-    insert.run("smsTemplate", "Hola {nombre}, te recordamos tu cita de {servicio} mañana día {fecha} a las {hora}. ¡Te esperamos!");
+    insert.run("smsTemplate", "Hola {nombre}, te recordamos tu cita de consulta de fisioterapia mañana día {fecha} a las {hora}. ¡Te esperamos!");
     insert.run("emailSubject", "Recordatorio de Cita - {servicio} mañana {fecha}");
     insert.run("dateFormat", "YYYY-MM-DD");
     insert.run("defaultDuration", "30");

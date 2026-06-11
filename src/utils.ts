@@ -108,7 +108,7 @@ export function parseTemplate(
   if (!template) return '';
   let result = template;
   result = result.replace(/{nombre}/g, data.nombre || '');
-  result = result.replace(/{servicio}/g, data.servicio || '');
+  result = result.replace(/{servicio}/g, 'consulta de fisioterapia');
   result = result.replace(/{fecha}/g, data.fecha || '');
   result = result.replace(/{hora}/g, data.hora || '');
   result = result.replace(/{duracion}/g, String(data.duracion || 0));

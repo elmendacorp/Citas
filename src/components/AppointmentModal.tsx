@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Bell, Eye, Sliders, Smartphone, Mail, Info, FileText, Check } from 'lucide-react';
+import { X, Bell, Eye, Info, FileText, Check } from 'lucide-react';
 import { Appointment, Client } from '../types';
 import { 
   DEFAULT_SMS_TEMPLATE, 
@@ -451,22 +451,19 @@ export default function AppointmentModal({
               <div>
                 <label className="block text-xs font-semibold text-slate-705 mb-1">Aviso Automatizado</label>
                 <select
-                  value={notificationEnabled ? notificationType : 'none'}
+                  value={notificationEnabled ? 'whatsapp' : 'none'}
                   onChange={(e) => {
                     const val = e.target.value;
                     if (val === 'none') {
                       setNotificationEnabled(false);
                     } else {
                       setNotificationEnabled(true);
-                      setNotificationType(val as any);
+                      setNotificationType('whatsapp');
                     }
                   }}
                   className="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-550 bg-white font-medium"
                 >
                   <option value="whatsapp">💬 WhatsApp</option>
-                  <option value="sms">📱 SMS</option>
-                  <option value="email">✉️ Email</option>
-                  <option value="both">👥 Varios (Todos)</option>
                   <option value="none">❌ Desactivado</option>
                 </select>
               </div>

@@ -115,7 +115,6 @@ export default function App() {
     if (!settings || !settings.notificationEnabled || !appt.notificationEnabled || appt.status === 'cancelled') return [];
 
     const alertDate = calculateAlertDate(appt.date);
-    const notificationsToSchedule: SentNotification[] = [];
 
     const compilePayload = {
       nombre: appt.clientName,
@@ -127,21 +126,8 @@ export default function App() {
       email: appt.clientEmail
     };
 
-    if (appt.notificationType === 'sms' || appt.notificationType === 'both') {
-      notificationsToSchedule.push({
-        id: `sms-${appt.id}-${Date.now()}`,
-        appointmentId: appt.id,
-        clientName: appt.clientName,
-        type: 'sms',
-        recipient: appt.clientPhone || 'Móvil no registrado',
-        content: parseTemplate(settings.smsTemplate, compilePayload),
-        scheduledForDate: alertDate,
-        status: 'pending'
-      });
-    }
-
-    if (appt.notificationType === 'whatsapp' || appt.notificationType === 'both') {
-      notificationsToSchedule.push({
+    return [
+      {
         id: `whatsapp-${appt.id}-${Date.now()}`,
         appointmentId: appt.id,
         clientName: appt.clientName,
@@ -150,24 +136,8 @@ export default function App() {
         content: parseTemplate(settings.smsTemplate, compilePayload),
         scheduledForDate: alertDate,
         status: 'pending'
-      });
-    }
-
-    if (appt.notificationType === 'email' || appt.notificationType === 'both') {
-      notificationsToSchedule.push({
-        id: `email-${appt.id}-${Date.now()}`,
-        appointmentId: appt.id,
-        clientName: appt.clientName,
-        type: 'email',
-        recipient: appt.clientEmail || 'Email no registrado',
-        subject: parseTemplate(settings.emailSubject, compilePayload),
-        content: parseTemplate(settings.emailTemplate, compilePayload),
-        scheduledForDate: alertDate,
-        status: 'pending'
-      });
-    }
-
-    return notificationsToSchedule;
+      }
+    ];
   };
 
   // Handle appointment creation or editing
@@ -700,7 +670,7 @@ export default function App() {
                                 duration: 30,
                                 notes: '',
                                 notificationEnabled: true,
-                                notificationType: 'both',
+                                notificationType: 'whatsapp',
                                 smsTemplate: '',
                                 emailSubject: '',
                                 emailTemplate: '',
@@ -745,7 +715,7 @@ export default function App() {
                   duration: settings?.defaultDuration || 30,
                   notes: '',
                   notificationEnabled: settings?.defaultNotificationType !== 'none',
-                  notificationType: settings?.defaultNotificationType === 'none' ? 'whatsapp' : settings?.defaultNotificationType,
+                  notificationType: 'whatsapp',
                   status: settings?.defaultStatus || 'scheduled'
                 } as any);
               } else {

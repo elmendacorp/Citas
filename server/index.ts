@@ -176,46 +176,36 @@ app.put('/api/notifications/:id', async (req, res) => {
     // Enviamos la notificación real a la API de WhatsApp Cloud.
     if (notif.status === 'sent' && notif.type === 'whatsapp') {
       try {
-        const token = process.env.WHATSAPP_TOKEN;
-        const phoneId = process.env.WHATSAPP_PHONE_ID;
-        if (!token || !phoneId) {
-          console.error('WhatsApp credentials not set in env');
+        const openwaUrl = process.env.OPENWA_API_URL || 'http://localhost:2785';
+        const apiKey = process.env.OPENWA_API_KEY || '';
+        // Format recipient number (E.164 without leading +)
+        const cleanPhone = notif.recipient.replace(/\D/g, '');
+        const formattedPhone = cleanPhone.includes('@') ? cleanPhone : `${cleanPhone}@c.us`;
+        const payload = {
+          to: formattedPhone,
+          body: notif.content,
+          buttons: [
+            { id: `CONFIRM_APPT_${notif.appointmentId}`, text: 'Sí' },
+            { id: `CANCEL_APPT_${notif.appointmentId}`, text: 'No' }
+          ]
+        };
+        const response = await fetch(`${openwaUrl}/api/sendButtons`, {
+          method: 'POST',
+          headers: {
+            ...(apiKey ? { 'X-API-Key': apiKey } : {}),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) {
+          const err = await response.text();
+          console.error('OpenWA API error:', response.status, err);
         } else {
-          // Format recipient number (E.164 without leading +)
-          const cleanPhone = notif.recipient.replace(/\D/g, '');
-          const payload = {
-            messaging_product: 'whatsapp',
-            to: cleanPhone,
-            type: 'interactive',
-            interactive: {
-              type: 'button',
-              body: { text: notif.content },
-              action: {
-                buttons: [
-                  { type: 'reply', reply: { id: `CONFIRM_APPT_${notif.appointmentId}`, title: 'Sí' } },
-                  { type: 'reply', reply: { id: `CANCEL_APPT_${notif.appointmentId}`, title: 'No' } }
-                ]
-              }
-            }
-          };
-          const response = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-          });
-          if (!response.ok) {
-            const err = await response.text();
-            console.error('WhatsApp API error:', response.status, err);
-          } else {
-            const resJson = await response.json();
-            console.log('WhatsApp message sent:', resJson);
-          }
+          const resJson = await response.json();
+          console.log('OpenWA message sent:', resJson);
         }
       } catch (e) {
-        console.error('Failed to send WhatsApp message:', e);
+        console.error('Failed to send WhatsApp message via OpenWA:', e);
       }
     }
 
@@ -269,7 +259,7 @@ function parseTemplate(template: string, data: any): string {
   if (!template) return '';
   let result = template;
   result = result.replace(/{nombre}/g, data.nombre || '');
-  result = result.replace(/{servicio}/g, data.servicio || '');
+  result = result.replace(/{servicio}/g, 'consulta de fisioterapia');
   result = result.replace(/{fecha}/g, data.fecha || '');
   result = result.replace(/{hora}/g, data.hora || '');
   result = result.replace(/{duracion}/g, String(data.duracion || 0));
@@ -323,42 +313,16 @@ function syncNotificationsForAppointment(apptId: string) {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     `);
 
-    if (settings.notificationType === 'sms' || settings.notificationType === 'both') {
-      insertNotif.run(
-        `sms-${appt.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        appt.id,
-        appt.clientName,
-        'sms',
-        appt.clientPhone || 'Móvil no registrado',
-        null,
-        parseTemplate(settings.smsTemplate, compilePayload),
-        alertDate
-      );
-    }
-    if (settings.notificationType === 'whatsapp' || settings.notificationType === 'both') {
-      insertNotif.run(
-        `whatsapp-${appt.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        appt.id,
-        appt.clientName,
-        'whatsapp',
-        appt.clientPhone || 'Móvil no registrado',
-        null,
-        parseTemplate(settings.smsTemplate, compilePayload),
-        alertDate
-      );
-    }
-    if (settings.notificationType === 'email' || settings.notificationType === 'both') {
-      insertNotif.run(
-        `email-${appt.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        appt.id,
-        appt.clientName,
-        'email',
-        appt.clientEmail || 'Email no registrado',
-        parseTemplate(settings.emailSubject, compilePayload),
-        parseTemplate(settings.emailTemplate, compilePayload),
-        alertDate
-      );
-    }
+    insertNotif.run(
+      `whatsapp-${appt.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      appt.id,
+      appt.clientName,
+      'whatsapp',
+      appt.clientPhone || 'Móvil no registrado',
+      null,
+      parseTemplate(settings.smsTemplate, compilePayload),
+      alertDate
+    );
   } catch (error) {
     console.error(`Error syncing notifications for appointment ${apptId}:`, error);
   }
@@ -400,42 +364,16 @@ function syncAllPendingNotifications() {
         professional: appt.professional || ''
       };
 
-      if (settings.notificationType === 'sms' || settings.notificationType === 'both') {
-        insertNotif.run(
-          `sms-${appt.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          appt.id,
-          appt.clientName,
-          'sms',
-          appt.clientPhone || 'Móvil no registrado',
-          null,
-          parseTemplate(settings.smsTemplate, compilePayload),
-          alertDate
-        );
-      }
-      if (settings.notificationType === 'whatsapp' || settings.notificationType === 'both') {
-        insertNotif.run(
-          `whatsapp-${appt.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          appt.id,
-          appt.clientName,
-          'whatsapp',
-          appt.clientPhone || 'Móvil no registrado',
-          null,
-          parseTemplate(settings.smsTemplate, compilePayload),
-          alertDate
-        );
-      }
-      if (settings.notificationType === 'email' || settings.notificationType === 'both') {
-        insertNotif.run(
-          `email-${appt.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          appt.id,
-          appt.clientName,
-          'email',
-          appt.clientEmail || 'Email no registrado',
-          parseTemplate(settings.emailSubject, compilePayload),
-          parseTemplate(settings.emailTemplate, compilePayload),
-          alertDate
-        );
-      }
+      insertNotif.run(
+        `whatsapp-${appt.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        appt.id,
+        appt.clientName,
+        'whatsapp',
+        appt.clientPhone || 'Móvil no registrado',
+        null,
+        parseTemplate(settings.smsTemplate, compilePayload),
+        alertDate
+      );
     });
 
     console.log(`Startup sync completed. Re-scheduled notifications for ${appointments.length} appointments.`);
@@ -459,10 +397,10 @@ app.put('/api/settings', (req, res) => {
     const settings = req.body;
     const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
     stmt.run('notificationEnabled', settings.notificationEnabled ? 'true' : 'false');
-    stmt.run('notificationType', settings.notificationType);
+    stmt.run('notificationType', 'whatsapp');
     stmt.run('smsTemplate', settings.smsTemplate);
-    stmt.run('emailSubject', settings.emailSubject);
-    stmt.run('emailTemplate', settings.emailTemplate);
+    stmt.run('emailSubject', '');
+    stmt.run('emailTemplate', '');
     stmt.run('dateFormat', settings.dateFormat || 'YYYY-MM-DD');
     stmt.run('defaultDuration', String(settings.defaultDuration || 30));
     stmt.run('defaultStatus', settings.defaultStatus || 'scheduled');
@@ -492,42 +430,16 @@ app.put('/api/settings', (req, res) => {
           email: appt.clientEmail
         };
 
-        if (settings.notificationType === 'sms' || settings.notificationType === 'both') {
-          insertNotif.run(
-            `sms-${appt.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            appt.id,
-            appt.clientName,
-            'sms',
-            appt.clientPhone || 'Móvil no registrado',
-            null,
-            parseTemplate(settings.smsTemplate, compilePayload),
-            alertDate
-          );
-        }
-        if (settings.notificationType === 'whatsapp' || settings.notificationType === 'both') {
-          insertNotif.run(
-            `whatsapp-${appt.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            appt.id,
-            appt.clientName,
-            'whatsapp',
-            appt.clientPhone || 'Móvil no registrado',
-            null,
-            parseTemplate(settings.smsTemplate, compilePayload),
-            alertDate
-          );
-        }
-        if (settings.notificationType === 'email' || settings.notificationType === 'both') {
-          insertNotif.run(
-            `email-${appt.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            appt.id,
-            appt.clientName,
-            'email',
-            appt.clientEmail || 'Email no registrado',
-            parseTemplate(settings.emailSubject, compilePayload),
-            parseTemplate(settings.emailTemplate, compilePayload),
-            alertDate
-          );
-        }
+        insertNotif.run(
+          `whatsapp-${appt.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          appt.id,
+          appt.clientName,
+          'whatsapp',
+          appt.clientPhone || 'Móvil no registrado',
+          null,
+          parseTemplate(settings.smsTemplate, compilePayload),
+          alertDate
+        );
       });
     }
 
@@ -592,6 +504,31 @@ app.post('/api/webhook/whatsapp', (req, res) => {
           }
         });
       });
+    }
+
+    // Process openwa button response webhook
+    let openwaButtonPayload = null;
+    if (body.type === 'buttons_response' && body.selectedButtonId) {
+      openwaButtonPayload = body.selectedButtonId;
+    } else if (body.data?.type === 'buttons_response' && body.data?.selectedButtonId) {
+      openwaButtonPayload = body.data.selectedButtonId;
+    } else if (body.event === 'onMessage' && body.data?.type === 'buttons_response' && body.data?.selectedButtonId) {
+      openwaButtonPayload = body.data.selectedButtonId;
+    }
+
+    if (openwaButtonPayload && typeof openwaButtonPayload === 'string') {
+      const parts = openwaButtonPayload.split('_');
+      const action = parts[0]; // CONFIRM or CANCEL
+      const apptId = parts.slice(2).join('_'); // Rejoin the rest as ID
+      
+      if (apptId) {
+        const newStatus = action === 'CONFIRM' ? 'confirmed' : 'cancelled';
+        db.prepare('UPDATE appointments SET status = ? WHERE id = ?').run(newStatus, apptId);
+        syncNotificationsForAppointment(apptId);
+        const appt: any = db.prepare('SELECT clientName FROM appointments WHERE id = ?').get(apptId);
+        addLog('Confirmación Webhook', `Cita de ${appt ? appt.clientName : apptId} marcada como ${newStatus} vía WhatsApp (OpenWA).`);
+        console.log(`OpenWA Webhook updated appointment ${apptId} to ${newStatus}`);
+      }
     }
 
     // For custom simulation if they hit this directly:
